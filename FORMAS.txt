@@ -1,0 +1,1 @@
+;codigo de visualizacion de formas en la amtriz de leds

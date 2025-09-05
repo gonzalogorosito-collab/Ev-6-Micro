@@ -1,1 +1,135 @@
+start:
+    .include "m328pdef.inc"
+
+    .org 0x0000
+    rjmp INICIO
+
+	.org 0x0012
+	rjmp overflow
+
+    .org 0x0100              ; INICIO de 
+		cara_feliz:
+			.db 0x3C, 0x42, 0xA5, 0x81, 0xA5, 0x99, 0x42, 0x3C
+	.org 0x0108              ; INICIO de 
+		cara_triste:
+			.db 0x3C, 0x42, 0xA5, 0x81, 0x99, 0xA5, 0x42, 0x3C
+	.org 0x0116              ; INICIO de 
+			Corazon:
+			.db 0x00, 0x01, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+	.org 0x0132              ; INICIO de 
+			ROMBO:
+			.db	0x24, 0x24, 0x7E, 0xDB, 0xFF, 0xBD, 0xA5, 0x24
+	.org 0x0200
+	rjmp INICIO
+
+INICIO:
+                        ; Habilita interrupciones globale
+    ; Inicializar el Stack Pointer
+    LDI r16, HIGH(RAMEND)
+    OUT SPH, r16
+    LDI r16, LOW(RAMEND)
+    OUT SPL, r16
+
+	; Timer1 en modo normal
+    LDI r16, 0x00
+    STS TCCR2A, r16
+	; Prescaler = clk/1
+    LDI r16, 0x01
+    STS TCCR2B, r16
+    
+	;habilitar interrupcion por tiempo
+	LDI r16, 0x01
+	STS TIMSK2, r16
+
+	SEI  
+
+    
+	ldi  r30, low(Corazon<<1)
+    ldi  r31, high(Corazon<<1)
+   
+
+	 ; Configurar PORTD como salida
+    LDI r16, 0xFF
+    OUT DDRD, r16
+
+	; Configurar PORTB como salida
+    LDI r16, 0x3F
+    OUT DDRB, r16
+
+	; Configurar PORTC como salida
+    LDI r16, 0x03
+    OUT DDRC, r16
+
+    ; Inicializar r17 con el primer bit encendido
+    LDI r17, 0x01
+    OUT PORTD, r17
+
+	LDI r18, 0b11111110
+	    ; Dividir r18: bits bajos a PORTB, bits altos a PORTC    
+	OUT PORTB, r18
+
+	MOV r23, r18
+	LSR r23
+	LSR r23
+	LSR r23
+	LSR r23
+	LSR r23
+	LSR r23             ; Desplazar r18 6 veces a la derecha para obtener bits 7:6
+	ANDI r23, 0b00000011 ; Máscara para tomar bits
+	OUT PORTC, r23
+	LDI r25, 8
+	LDI r27, 8
+
+	ldi r26, 1
+
+    JMP PRINCIPAL
+
+
+PRINCIPAL:
+	
+	rcall prender
+    
+
+    RJMP PRINCIPAL
+
+overflow:
+	lpm  r19, Z+          ; r16 = *Z; Z++
+
+		reti
+
+prender:
+	
+		
+	LSL r17             
+	BRNE continuar_r17
+	LDI r17, 0x01       ; Reset r17 a 0b00000001 si desborda
+	LSL r18             ; Desplazar izquierda
+	ldi r26, 1
+	add r18, r26
+	dec r25
+	BRNE continuar_r17
+	ldi  r30, low(Corazon<<1)
+    ldi  r31, high(Corazon<<1)
+	ldi r18, 0b11111110
+	ldi r25, 8
+continuar_r17:
+
+	OUT PORTB, r18
+
+	MOV r23, r18
+	LSR r23
+	LSR r23
+	LSR r23
+	LSR r23
+	LSR r23
+	LSR r23             ; Desplazar r18 6 veces a la derecha para obtener bits 7:6
+	ANDI r23, 0b00000011 ; Máscara para tomar bits 7:6 (ahora en 1:0)
+
+	OUT PORTC, r23
+
+	AND r19, r17
+
+	OUT PORTD, r19
+
+	ret
 ;codigo de visualizacion de formas en la amtriz de leds

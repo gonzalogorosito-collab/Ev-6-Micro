@@ -1,1 +1,83 @@
 ;codigo para parte 3 de visualizacion en la seccion superior de leds
+
+start:
+    .include "m328pdef.inc"
+
+    .org 0x0000
+    rjmp INICIO
+
+    .org 0x001A               ; Vector de interrupción de Timer1 Overflow
+    rjmp OVERFLOW_pasa_sig
+
+    .org 0x0100              ; INICIO de 
+		seq:
+			.db 0b00000000, 0b11000011, 0b00111100, 0b11000011, 0b00000000
+
+	.org 0x0200
+	rjmp PRINCIPAL
+
+INICIO:
+                        ; Habilita interrupciones globale
+    ; Inicializar el Stack Pointer
+    LDI r16, HIGH(RAMEND)
+    OUT SPH, r16
+    LDI r16, LOW(RAMEND)
+    OUT SPL, r16
+
+	; Prescaler = clk/1 (puedes usar clk/1024 para hacerlo más lento)
+    LDI r16, 0x05
+    STS TCCR1B, r16
+
+
+
+    ; Habilitar interrupción por desbordamiento de Timer1
+    LDI r16, (1<<TOIE1)
+    STS TIMSK1, r16
+
+	SEI  
+
+    ; Timer1 en modo normal
+    LDI r16, 0x00
+    STS TCCR1A, r16
+
+    ; Prescaler = clk/1 (puedes usar clk/1024 para hacerlo más lento)
+    LDI r16, 0x05
+    STS TCCR1B, r16
+
+	;LDI r18, 
+	LDI r16, 0xFF
+    OUT DDRD, r16
+
+	LDI r25, 5
+
+    LDI r20, LOW(10000)
+    LDI r22, HIGH(10000)
+
+	ldi  r30, low(seq<<1)   ; ZL = parte baja de la dirección en bytes
+    ldi  r31, high(seq<<1)  ; ZH = parte alta de la dirección en bytes
+
+
+    JMP PRINCIPAL
+
+
+PRINCIPAL:
+    RJMP PRINCIPAL
+
+OVERFLOW_pasa_sig:
+    
+	; Leer siguiente byte de la tabla en FLASH
+    lpm  r16, Z+          ; r16 = *Z; Z++
+    out  PORTD, r16       ; sacar al puerto
+
+    ; Decrementar contador; si no llega a 0, fin
+    dec  r25
+brne _isr_done
+    ; Si llegó a 0 → reiniciar Z y contador
+	;ldi  r21, 5
+
+    ldi  r30, low(seq<<1)
+    ldi  r31, high(seq<<1)
+    ldi  r25, 5
+
+_isr_done:
+    RETI

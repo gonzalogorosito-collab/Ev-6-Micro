@@ -4,132 +4,179 @@ start:
     .org 0x0000
     rjmp INICIO
 
-	.org 0x0012
-	rjmp overflow
+    .org 0x0012
+    rjmp overflow
 
-    .org 0x0100              ; INICIO de 
-		cara_feliz:
-			.db 0x3C, 0x42, 0xA5, 0x81, 0xA5, 0x99, 0x42, 0x3C
-	.org 0x0108              ; INICIO de 
-		cara_triste:
-			.db 0x3C, 0x42, 0xA5, 0x81, 0x99, 0xA5, 0x42, 0x3C
-	.org 0x0116              ; INICIO de 
-			Corazon:
-			.db 0x00, 0x01, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
-	.org 0x0132              ; INICIO de 
-			ROMBO:
-			.db	0x24, 0x24, 0x7E, 0xDB, 0xFF, 0xBD, 0xA5, 0x24
-	.org 0x0200
-	rjmp INICIO
+    .org 0x000A
+    rjmp botons
+
+    .org 0x0100
+        cara_feliz:
+            .db 0x3C, 0x42, 0xA5, 0x81, 0xA5, 0x99, 0x42, 0x3C
+    .org 0x0108
+        cara_triste:
+            .db 0x3C, 0x42, 0xA5, 0x81, 0x99, 0xA5, 0x42, 0x3C
+    .org 0x0116
+        Corazon:
+            .db 0x00, 0x66, 0xFF, 0xFF, 0xFF, 0x7E, 0x3C, 0x18
+    .org 0x0132
+        ROMBO:
+            .db 0x18, 0x3C, 0x7E, 0xFF, 0x7E, 0x3C, 0x18, 0x00
+    .org 0x013A
+        ALIEN:
+            .db 0x24, 0x24, 0x7E, 0xDB, 0xFF, 0xBD, 0xA5, 0x24
+    .org 0x0200
+    rjmp INICIO
 
 INICIO:
-                        ; Habilita interrupciones globale
-    ; Inicializar el Stack Pointer
     LDI r16, HIGH(RAMEND)
     OUT SPH, r16
     LDI r16, LOW(RAMEND)
     OUT SPL, r16
 
-	; Timer1 en modo normal
     LDI r16, 0x00
     STS TCCR2A, r16
-	; Prescaler = clk/1
     LDI r16, 0x01
     STS TCCR2B, r16
-    
-	;habilitar interrupcion por tiempo
-	LDI r16, 0x01
-	STS TIMSK2, r16
+    LDI r16, 0x01
+    STS TIMSK2, r16
 
-	SEI  
+    ldi r16, 0b00011000
+    out DDRC, r16
 
-    
-	ldi  r30, low(Corazon<<1)
-    ldi  r31, high(Corazon<<1)
-   
+    lds  r16, PCMSK1
+    ori  r16, (1<<4) | (1<<3)
+    sts  PCMSK1, r16
 
-	 ; Configurar PORTD como salida
+    sbi  PCIFR, PCIF1
+
+    lds  r16, PCICR
+    ori  r16, (1<<PCIE1)
+    sts  PCICR, r16
+
+    sei
+
+    ldi  r25, low(cara_feliz<<1)
+    ldi  r26, high(cara_feliz<<1)
+    MOV  r30, r25
+    MOV  r31, r26
+
     LDI r16, 0xFF
     OUT DDRD, r16
 
-	; Configurar PORTB como salida
     LDI r16, 0x3F
     OUT DDRB, r16
 
-	; Configurar PORTC como salida
-    LDI r16, 0x03
-    OUT DDRC, r16
-
-    ; Inicializar r17 con el primer bit encendido
     LDI r17, 0x01
     OUT PORTD, r17
 
-	LDI r18, 0b11111110
-	    ; Dividir r18: bits bajos a PORTB, bits altos a PORTC    
-	OUT PORTB, r18
+    ldi r16, 0b00011011
+    out DDRC, r16
 
-	MOV r23, r18
-	LSR r23
-	LSR r23
-	LSR r23
-	LSR r23
-	LSR r23
-	LSR r23             ; Desplazar r18 6 veces a la derecha para obtener bits 7:6
-	ANDI r23, 0b00000011 ; Máscara para tomar bits
-	OUT PORTC, r23
-	LDI r25, 8
-	LDI r27, 8
+    cbi DDRC, DDC4
+    sbi PORTC, PORTC4
+    cbi DDRC, DDC3
+    sbi PORTC, PORTC3
 
-	ldi r26, 1
+    LDI r18, 0b11111110
+    OUT PORTB, r18
+
+    MOV r23, r18
+    LSR r23
+    LSR r23
+    LSR r23
+    LSR r23
+    LSR r23
+    LSR r23
+    ANDI r23, 0b00000011
+    OUT PORTC, r23
+    LDI r24, 0
+
+    ldi r19, 1
 
     JMP PRINCIPAL
 
-
 PRINCIPAL:
-	
-	rcall prender
-    
-
     RJMP PRINCIPAL
 
 overflow:
-	lpm  r19, Z+          ; r16 = *Z; Z++
+    LDI  r20, 0x00
+    OUT  PORTD, r20
 
-		reti
+    LPM  r18, Z+
+    INC  r24
+    CPI  r24, 8
+    BRLO skip_reset_ptr
+      MOV r30, r25
+      MOV r31, r26
+      LDI r24, 0
+skip_reset_ptr:
 
-prender:
-	
-		
-	LSL r17             
-	BRNE continuar_r17
-	LDI r17, 0x01       ; Reset r17 a 0b00000001 si desborda
-	LSL r18             ; Desplazar izquierda
-	ldi r26, 1
-	add r18, r26
-	dec r25
-	BRNE continuar_r17
-	ldi  r30, low(Corazon<<1)
-    ldi  r31, high(Corazon<<1)
-	ldi r18, 0b11111110
-	ldi r25, 8
-continuar_r17:
+    COM r18
 
-	OUT PORTB, r18
+    MOV  r23, r18
+    ANDI r23, 0b00111111
+    OUT  PORTB, r23
 
-	MOV r23, r18
-	LSR r23
-	LSR r23
-	LSR r23
-	LSR r23
-	LSR r23
-	LSR r23             ; Desplazar r18 6 veces a la derecha para obtener bits 7:6
-	ANDI r23, 0b00000011 ; Máscara para tomar bits 7:6 (ahora en 1:0)
+    MOV  r23, r18
+    LSR  r23
+    LSR  r23
+    LSR  r23
+    LSR  r23
+    LSR  r23
+    LSR  r23
+    ANDI r23, 0b00000011
+    OUT  PORTC, r23
 
-	OUT PORTC, r23
+    OUT  PORTD, r17
 
-	AND r19, r17
+    LSL  r17
+    BRNE end_ovf
+      LDI  r17, 0x01
+end_ovf:
+    RETI
 
-	OUT PORTD, r19
+botons:
+    SBIC PINC, 4
+    RJMP continuar1
+    INC  r19
+continuar1:
+    SBIC PINC, 3
+    RJMP continuar
+    DEC  r19
 
-	ret
-;codigo de visualizacion de formas en la amtriz de leds
+continuar:
+    CPI  r19, 6
+    BRNE skip_wrap2
+    ldi  r19, 1
+skip_wrap2:
+    CPI  r19, 0
+    BRNE skip_wrap
+    LDI  r19, 5
+skip_wrap:
+    CPI  r19, 1
+    BRNE UNO
+    LDI  r25, low(cara_feliz<<1)
+    LDI  r26, high(cara_feliz<<1)
+UNO:
+    CPI  r19, 2
+    BRNE DOS
+    LDI  r25, low(cara_triste<<1)
+    LDI  r26, high(cara_triste<<1)
+DOS:
+    CPI  r19, 3
+    BRNE TRES
+    LDI  r25, low(ROMBO<<1)
+    LDI  r26, high(ROMBO<<1)
+TRES:
+    CPI  r19, 4
+    BRNE CUATRO
+    LDI  r25, low(Corazon<<1)
+    LDI  r26, high(Corazon<<1)
+CUATRO:
+    CPI  r19, 5
+    BRNE fin
+    LDI  r25, low(ALIEN<<1)
+    LDI  r26, high(ALIEN<<1)
+fin:
+    RETI
